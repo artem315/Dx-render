@@ -228,3 +228,10 @@ JFN(jint, nPresentAndroid)(JNIEnv *env, jclass cls, jlong dev, jlong window, jlo
     (void)env; (void)cls;
     return dxr_present_android(DEV(dev), (void *)(intptr_t)window, (const uint8_t *)(intptr_t)src, sw, sh, sstride);
 }
+
+JFN(jstring, nProfileText)(JNIEnv *env, jclass cls, jlong dev, jboolean reset) {
+    (void)cls;
+    static _Thread_local char buf[32768];
+    dxr_device_profile(DEV(dev), buf, sizeof(buf), reset);
+    return (*env)->NewStringUTF(env, buf);
+}

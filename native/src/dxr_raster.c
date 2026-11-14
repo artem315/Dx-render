@@ -154,6 +154,8 @@ typedef struct geom_ctx {
     uint32_t vb_stride[DXR_MAX_VERTEX_BUFFERS];
     uint8_t vb_step[DXR_MAX_VERTEX_BUFFERS];
     int vchunk, pchunk;
+    int use_fast_vs;
+    dxr_kdata vs_data;
 } geom_ctx;
 
 static dxr_vm *get_vm(const dxr_pipeline *pipe, int thread, int fragment) {
@@ -192,9 +194,46 @@ static void fetch_attribs(const geom_ctx *g, dxr_cell *R, int vertex, int instan
     }
 }
 
+static void shade_job_fast(geom_ctx *g, int chunk, int thread) {
+    const dxr_pipeline *p = g->pipe;
+    const dxr_draw *d = g->draw;
+    dxr_cell attr[DXR_MAX_ATTRIBS][4];
+    memset(attr, 0, sizeof(attr));
+    int start = chunk * g->vchunk, end = DXR_MIN(g->nverts, start + g->vchunk);
+    const int instance = g->instance + d->first_instance;
+    for (int i = start; i < end; i++) {
+        int vertex = g->vmin + i;
+        for (int k = 0; k < p->num_attribs; k++) {
+            const dxr_attrib *a = &p->attribs[k];
+            if (p->attrib_cell[k] == UINT32_MAX || a->location >= DXR_MAX_ATTRIBS) continue;
+            int64_t idx = g->vb_step[a->slot] ? (int64_t)instance : (int64_t)vertex;
+            uint64_t off = (uint64_t)idx * g->vb_stride[a->slot] + a->offset;
+            uint32_t need = (uint32_t)dxr_ctype_bytes(a->ctype) * a->ncomp;
+            dxr_cell *tmp = attr[a->location];
+            int src_int = dxr_ctype_is_int(a->ctype);
+            if (DXR_UNLIKELY(!d->vb[a->slot] || idx < 0 || off + need > d->vb_size[a->slot])) {
+                tmp[0].u = tmp[1].u = tmp[2].u = 0;
+                if (src_int) tmp[3].i = 1; else tmp[3].f = 1.0f;
+            } else if (a->ctype == DXR_CT_FLOAT32) {
+                tmp[0].f = tmp[1].f = tmp[2].f = 0.0f; tmp[3].f = 1.0f;
+                memcpy(tmp, d->vb[a->slot] + off, need);
+            } else {
+                dxr_texel_load(d->vb[a->slot] + off, a->ctype, a->ncomp, tmp);
+            }
+            if (p->attrib_is_int[k] != src_int) {
+                if (src_int) for (int c = 0; c < 4; c++) tmp[c].f = (float)tmp[c].i;
+                else for (int c = 0; c < 4; c++) tmp[c].i = (int32_t)tmp[c].f;
+            }
+        }
+        p->fast_vs->vertex(&g->vs_data, d->uniforms, (const dxr_cell (*)[4])attr, &g->clip[(size_t)i * 4], &g->vary[(size_t)i * g->V]);
+    }
+    g->dev->tstats[thread].vertices_shaded += (uint64_t)(end - start);
+}
+
 static void shade_job(void *vctx, int chunk, int thread) {
     geom_ctx *g = (geom_ctx *)vctx;
     const dxr_pipeline *p = g->pipe;
+    if (g->use_fast_vs) { shade_job_fast(g, chunk, thread); return; }
     dxr_vm *vm = get_vm(p, thread, 0);
     if (!vm) return;
     dxr_cell *R = dxr_vm_cells(vm);
@@ -604,11 +643,23 @@ int dxr_pass_draw(dxr_device *dev, const dxr_draw *draw) {
         g.vchunk = 128;
         g.pchunk = 256;
         g.key_base = (pass->draw_seq++) << 26;
+        g.use_fast_vs = 0;
+        if (pipe->fast_vs && dev->cfg.fast_shaders) {
+            g.vs_data = *pipe->vs_data;
+            g.use_fast_vs = pipe->fast_vs->vertex_begin(&g.vs_data, draw->uniforms);
+        }
         dxr_pool_run(dev->pool, shade_job, &g, (g.nverts + g.vchunk - 1) / g.vchunk, 1);
         dxr_pool_run(dev->pool, prim_job, &g, (g.nprims + g.pchunk - 1) / g.pchunk, 1);
         dxr_arena_reset(&dev->vtx_arena);
     }
-    dev->stats.ns_geometry += dxr_now_ns() - t0;
+    {
+        uint64_t dt = dxr_now_ns() - t0;
+        dxr_pipeline *pp = (dxr_pipeline *)pipe;
+        pp->prof_vs_ns += dt;
+        pp->prof_verts += (uint64_t)g.nverts * (uint64_t)instances;
+        pp->prof_draws++;
+        dev->stats.ns_geometry += dt;
+    }
     return 1;
 }
 
@@ -713,6 +764,7 @@ static void raster_tri(dxr_device *dev, const struct dxr_pass *pass, const dxr_t
     }
     dxr_vm *vm = get_vm(pipe, thread, 1);
     if (!vm) return;
+    const uint64_t prof_t0 = dxr_now_ns();
     dxr_cell *R = dxr_vm_cells(vm);
     const int V = pipe->varying_cells;
     const float *a0 = tri->var, *dvx = tri->var + V, *dvy = tri->var + 2 * V;
@@ -731,8 +783,10 @@ static void raster_tri(dxr_device *dev, const struct dxr_pass *pass, const dxr_t
     ctx.dvdx = need_grad ? gx : NULL;
     ctx.dvdy = need_grad ? gy : NULL;
     ctx.front_facing = tri->front;
-    uint64_t shaded = 0, discarded = 0, zfail = 0;
+    uint64_t shaded = 0, discarded = 0, zfail = 0, fast = 0;
     int wrote_depth = 0;
+    const dxr_fast_kernel *kern = (dev->cfg.fast_shaders && !writes_fragdepth) ? pipe->fast : NULL;
+    float kout[4];
     for (int y = ya; y <= yb; y++) {
         /* exact span of pixel centers inside all three edges */
         int64_t Yc = (int64_t)y * SUBPIX + SUBPIX / 2;
@@ -773,13 +827,24 @@ static void raster_tri(dxr_device *dev, const struct dxr_pass *pass, const dxr_t
                     if (need_grad) { gx[s] = (dvx[s] - v * tri->dwdx) * w; gy[s] = (dvy[s] - v * tri->dwdy) * w; }
                 }
             }
-            for (int m = 0; m < pipe->num_varyings; m++) memcpy(&R[pipe->varyings[m].fs_cell], &vary[pipe->varyings[m].slot], (size_t)pipe->varyings[m].cells * 4);
             ctx.frag_coord[0] = (float)x + 0.5f;
             ctx.frag_coord[1] = (float)y + 0.5f;
             ctx.frag_coord[2] = z;
             ctx.frag_coord[3] = iw;
             shaded++;
-            if (!dxr_vm_run(vm, &ctx)) { discarded++; continue; }
+            int handled = kern ? kern->fragment(pipe->fs_data, &ctx, kout) : -1;
+            if (handled < 0) {
+                for (int m = 0; m < pipe->num_varyings; m++) memcpy(&R[pipe->varyings[m].fs_cell], &vary[pipe->varyings[m].slot], (size_t)pipe->varyings[m].cells * 4);
+                if (!dxr_vm_run(vm, &ctx)) { discarded++; continue; }
+            } else if (handled == 0) {
+                discarded++; fast++;
+                continue;
+            } else {
+                fast++;
+                if (depth_on && depth_write && !early_write) { drow[x] = z; wrote_depth = 1; }
+                if (pass->color_tex[0]) write_color(pass, pipe, 0, x, y, (const dxr_cell *)kout);
+                continue;
+            }
             if (depth_on) {
                 if (writes_fragdepth) {
                     z = R[fragdepth_cell].f;
@@ -795,7 +860,14 @@ static void raster_tri(dxr_device *dev, const struct dxr_pass *pass, const dxr_t
         }
     }
     if (wrote_depth) { if (monotonic) ts->hiz_dirty++; else ts->hiz_valid = 0; }
+    {
+        dxr_pipeline *pp = (dxr_pipeline *)pipe;
+        pp->prof[thread].frags += shaded;
+        pp->prof[thread].tris++;
+        pp->prof[thread].ns += dxr_now_ns() - prof_t0;
+    }
     st->fragments_shaded += shaded;
+    st->fragments_fast += fast;
     st->fragments_discarded += discarded;
     st->fragments_depth_failed += zfail;
 }

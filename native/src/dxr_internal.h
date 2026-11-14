@@ -154,6 +154,7 @@ typedef struct dxr_varying_map {
     uint32_t fs_cell;       /* destination cells in the fragment machine */
     uint16_t slot;          /* first varying slot */
     uint16_t cells;
+    uint16_t location;
     uint8_t flat;
 } dxr_varying_map;
 
@@ -187,28 +188,46 @@ struct dxr_pipeline {
     uint8_t out_ncomp[DXR_MAX_COLOR_TARGETS];
     uint8_t out_is_int[DXR_MAX_COLOR_TARGETS];
     int fs_flags;
-    const struct dxr_fast_kernel *fast;      /* verified native kernel or NULL */
-    void *fast_data;
+    char uniform_name[DXR_MAX_UNIFORMS][48];
+    const struct dxr_fast_kernel *fast;      /* verified fragment kernel or NULL */
+    const struct dxr_fast_kernel *fast_vs;   /* verified vertex kernel or NULL */
+    struct dxr_kdata *fs_data, *vs_data;
+    /* profiler: per thread accumulators, merged on demand */
+    struct dxr_pipeline *next;
+    struct { uint64_t frags, ns, tris; uint8_t pad[40]; } prof[DXR_MAX_THREADS];
+    uint64_t prof_vs_ns, prof_verts, prof_draws;
 };
 
 /* ======================= Lighting System / fast kernels ==================== */
 struct dxr_tri;
 struct dxr_draw_state;
 
+/* Parameters a kernel resolved for one pipeline: uniform slots, varying slots, variant constants. */
+typedef struct dxr_kdata {
+    int8_t u[8];
+    int16_t slot[8];
+    float f[4];
+    int i[4];
+    float m[16];          /* per draw scratch of vertex kernels (e.g. combined matrix) */
+} dxr_kdata;
+
 typedef struct dxr_fast_kernel {
     const char *name;
-    /* Returns 1 if the pipeline matches the kernel's structural requirements. */
-    int (*match)(struct dxr_pipeline *p);
-    /* Shades vertices [first, first+count) of one instance. Writes clip positions (4 floats)
-     * and varyings (p->varying_cells floats) per vertex. */
-    void (*vertex)(const struct dxr_pipeline *p, const dxr_draw *d, int first, int count, int instance,
-                   float *clip, float *varyings);
-    /* Shades a span of one row: returns 0 on a per pixel basis through mask (bit per pixel, max 64). */
-    int (*fragment)(const struct dxr_pipeline *p, const struct dxr_draw_state *ds, const float *varyings,
-                    const float *dvdx, const float *dvdy, const float frag_coord[4], float out_rgba[4]);
+    int fragment_stage;
+    int variants;
+    /* Structural check: resolves slots into d. Returns 0 when the pipeline cannot be this shader. */
+    int (*bind)(const struct dxr_pipeline *p, dxr_kdata *d, int variant);
+    /* Makes random uniform data plausible for this shader (integer fields etc.). */
+    void (*fixup)(const dxr_kdata *d, dxr_uniform_binding *uniforms, uint32_t *rng);
+    /* Fragment: 1 = shaded, 0 = discarded, -1 = not handled, run the interpreter. */
+    int (*fragment)(const dxr_kdata *d, const dxr_frag_ctx *ctx, float out[4]);
+    /* Vertex: once per draw, then per vertex. attr is indexed by attribute location. Returns 0 to fall back. */
+    int (*vertex_begin)(dxr_kdata *d, const dxr_uniform_binding *uniforms);
+    void (*vertex)(const dxr_kdata *d, const dxr_uniform_binding *uniforms, const dxr_cell attr[][4], float clip[4], float *vary);
 } dxr_fast_kernel;
 
-const dxr_fast_kernel *dxr_fast_find(struct dxr_pipeline *p, dxr_device *dev);
+/* Finds and verifies kernels for both stages of p (sets p->fast, p->fast_vs). */
+void dxr_fast_attach(struct dxr_pipeline *p);
 
 /* Minecraft lighting math implemented natively (used by fast kernels and tests). */
 void dxr_light_lightmap_uv(int u, int v, float out_uv[2]);
@@ -228,6 +247,8 @@ struct dxr_device {
     struct dxr_pass *pass;
     dxr_stats stats;
     _Atomic uint64_t texture_bytes;
+    struct dxr_pipeline *pipelines;     /* registry for the profiler */
+    _Atomic int pipelines_lock;
     /* per thread counters merged at pass end */
     struct dxr_thread_stats {
         uint64_t fragments_shaded, fragments_fast, fragments_discarded, fragments_depth_failed;

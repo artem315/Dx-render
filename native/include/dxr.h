@@ -161,6 +161,8 @@ void dxr_pipeline_destroy(dxr_device *dev, dxr_pipeline *p);
 /* 0 = interpreter only, 1 = verified fast kernel active */
 int dxr_pipeline_fast_path(const dxr_pipeline *p);
 const char *dxr_pipeline_info(const dxr_pipeline *p);
+/* Writes a per pipeline time breakdown (one line each, heaviest first) into buf. */
+size_t dxr_device_profile(dxr_device *dev, char *buf, size_t cap, int reset);
 
 /* ---- render passes -------------------------------------------------------- */
 int dxr_pass_begin(dxr_device *dev, const dxr_pass_desc *desc);

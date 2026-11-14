@@ -7,7 +7,7 @@ out="$2"
 here="$(cd "$(dirname "$0")" && pwd)"
 src=("$here"/src/dxr_memory.c "$here"/src/dxr_sched.c "$here"/src/dxr_texture.c "$here"/src/dxr_spirv.c "$here"/src/dxr_pipeline.c
      "$here"/src/dxr_raster.c "$here"/src/dxr_device.c "$here"/src/dxr_fast.c "$here"/src/dxr_jni.c)
-common=(-std=c11 -O3 -fPIC -shared -fvisibility=hidden -fno-math-errno -fno-trapping-math -Wall -Wextra -D_GNU_SOURCE -I"$here/include")
+common=(-std=c11 -O3 -fPIC -shared -fvisibility=hidden -fno-math-errno -fno-trapping-math -ffp-contract=off -Wall -Wextra -D_GNU_SOURCE -I"$here/include")
 mkdir -p "$out"
 case "$target" in
   linux-x86_64)

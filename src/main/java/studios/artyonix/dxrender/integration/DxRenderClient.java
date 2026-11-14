@@ -24,6 +24,7 @@ public final class DxRenderClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		ensureConfigLoaded();
+		DxSelfTest.register();
 		// The backend is created after mod initialisation, so report once the client is up.
 		ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
 			if (DxRender.isBackendActive()) {

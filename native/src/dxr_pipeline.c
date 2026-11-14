@@ -94,6 +94,7 @@ dxr_pipeline *dxr_pipeline_create(dxr_device *dev, const uint8_t *blob, size_t l
     for (int i = 0; i < p->num_uniforms && !r.failed; i++) {
         rd_str(&r, names[i], sizeof(names[i]));
         name_ptrs[i] = names[i];
+        snprintf(p->uniform_name[i], sizeof(p->uniform_name[i]), "%s", names[i]);
         p->uniform_kind[i] = (uint8_t)rd_u32(&r);
         rd_u32(&r);
         rd_u32(&r);
@@ -170,6 +171,7 @@ dxr_pipeline *dxr_pipeline_create(dxr_device *dev, const uint8_t *blob, size_t l
             return NULL;
         }
         m->slot = (uint16_t)slot;
+        m->location = fin[i].location;
         for (int c = 0; c < m->cells; c++) p->slot_flat[slot + c] = m->flat;
         dxr_shader_set_input_slot(p->fs, i, slot);
         slot += m->cells;
@@ -192,23 +194,37 @@ dxr_pipeline *dxr_pipeline_create(dxr_device *dev, const uint8_t *blob, size_t l
         }
     }
     p->fs_flags = dxr_shader_flags(p->fs);
-    p->fast = dev && dev->cfg.fast_shaders ? dxr_fast_find(p, dev) : NULL;
+    if (dev) {
+        int expected = 0;
+        while (!atomic_compare_exchange_weak(&dev->pipelines_lock, &expected, 1)) expected = 0;
+        p->next = dev->pipelines;
+        dev->pipelines = p;
+        atomic_store(&dev->pipelines_lock, 0);
+    }
+    if (!dev || dev->cfg.fast_shaders) dxr_fast_attach(p);
     snprintf(p->info, sizeof(p->info), "%s vs=%016llx fs=%016llx varyings=%d cells=%u/%u %s", p->name,
              (unsigned long long)dxr_shader_hash(p->vs), (unsigned long long)dxr_shader_hash(p->fs), p->varying_cells,
              dxr_shader_num_cells(p->vs), dxr_shader_num_cells(p->fs), p->fast ? p->fast->name : "interpreter");
+    if (p->fast_vs) { size_t l = strlen(p->info); snprintf(p->info + l, sizeof(p->info) - l, " +vs:%s", p->fast_vs->name); }
     return p;
 }
 
 void dxr_pipeline_destroy(dxr_device *dev, dxr_pipeline *p) {
-    (void)dev;
     if (!p) return;
+    if (dev) {
+        int expected = 0;
+        while (!atomic_compare_exchange_weak(&dev->pipelines_lock, &expected, 1)) expected = 0;
+        for (dxr_pipeline **pp = &dev->pipelines; *pp; pp = &(*pp)->next) if (*pp == p) { *pp = p->next; break; }
+        atomic_store(&dev->pipelines_lock, 0);
+    }
     for (int i = 0; i < DXR_MAX_THREADS; i++) {
         dxr_vm_destroy(p->vs_vm[i]);
         dxr_vm_destroy(p->fs_vm[i]);
     }
     dxr_shader_destroy(p->vs);
     dxr_shader_destroy(p->fs);
-    dxr_free(p->fast_data);
+    dxr_free(p->fs_data);
+    dxr_free(p->vs_data);
     dxr_free(p);
 }
 
@@ -266,4 +282,38 @@ void dxr_blend(const dxr_blend_state *bs, const float src[4], const float dst[4]
     out[1] = blend_op(bs->op_c, src[1], sfc[1], dst[1], dfc[1]);
     out[2] = blend_op(bs->op_c, src[2], sfc[2], dst[2], dfc[2]);
     out[3] = blend_op(bs->op_a, src[3], sfa[3], dst[3], dfa[3]);
+}
+
+size_t dxr_device_profile(dxr_device *dev, char *buf, size_t cap, int reset) {
+    typedef struct row { const dxr_pipeline *p; uint64_t frags, ns, tris; } row;
+    row rows[512];
+    int n = 0;
+    int expected = 0;
+    while (!atomic_compare_exchange_weak(&dev->pipelines_lock, &expected, 1)) expected = 0;
+    for (dxr_pipeline *p = dev->pipelines; p && n < 512; p = p->next) {
+        row r = {p, 0, 0, 0};
+        for (int t = 0; t < DXR_MAX_THREADS; t++) {
+            r.frags += p->prof[t].frags; r.ns += p->prof[t].ns; r.tris += p->prof[t].tris;
+            if (reset) { p->prof[t].frags = 0; p->prof[t].ns = 0; p->prof[t].tris = 0; }
+        }
+        if (r.ns || p->prof_vs_ns) rows[n++] = r;
+    }
+    for (int i = 1; i < n; i++) {
+        row v = rows[i];
+        int j = i;
+        while (j > 0 && rows[j - 1].ns + rows[j - 1].p->prof_vs_ns < v.ns + v.p->prof_vs_ns) { rows[j] = rows[j - 1]; j--; }
+        rows[j] = v;
+    }
+    size_t off = 0;
+    if (cap) buf[0] = 0;
+    for (int i = 0; i < n && off + 200 < cap; i++) {
+        const dxr_pipeline *p = rows[i].p;
+        off += (size_t)snprintf(buf + off, cap - off, "%-52s %s raster %8.2f ms %9llu frags %7llu tris | geometry %7.2f ms %8llu verts %6llu draws\n",
+                                p->name, p->fast ? (p->fast_vs ? "FAST+V" : "FAST  ") : (p->fast_vs ? "vm  +V" : "vm    "), (double)rows[i].ns / 1.0e6, (unsigned long long)rows[i].frags,
+                                (unsigned long long)rows[i].tris, (double)p->prof_vs_ns / 1.0e6, (unsigned long long)p->prof_verts,
+                                (unsigned long long)p->prof_draws);
+    }
+    if (reset) for (int i = 0; i < n; i++) { dxr_pipeline *p = (dxr_pipeline *)rows[i].p; p->prof_vs_ns = 0; p->prof_verts = 0; p->prof_draws = 0; }
+    atomic_store(&dev->pipelines_lock, 0);
+    return off;
 }

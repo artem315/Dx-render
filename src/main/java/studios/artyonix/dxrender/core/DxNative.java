@@ -119,6 +119,8 @@ public final class DxNative {
 
 	public static native boolean nPipelineFast(long pipeline);
 
+	public static native String nProfileText(long device, boolean reset);
+
 	public static native int nPassBegin(long device, long passBlock);
 
 	public static native int nDraw(long device, long drawBlock);
