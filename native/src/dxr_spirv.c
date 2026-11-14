@@ -126,7 +126,7 @@ enum {
     I_F2U, I_F2S, I_S2F, I_U2F,
     I_VEXTRACT, I_VINSERT,
     I_DPDX, I_DPDY, I_FWIDTH,
-    I_SAMPLE_IMPLICIT, I_SAMPLE_LOD, I_SAMPLE_GRAD, I_FETCH, I_QUERY_SIZE, I_QUERY_LEVELS,
+    I_SAMPLE_IMPLICIT, I_SAMPLE_LOD, I_SAMPLE_GRAD, I_SAMPLE_PROJ, I_FETCH, I_QUERY_SIZE, I_QUERY_LEVELS,
     I_GLSL
 };
 
@@ -795,6 +795,11 @@ static void decode_function(emit_ctx *e, const uint32_t *w, sp_func *fn) {
                 push_extra(s, vcell(s, in[7]));
                 emit(s, I_SAMPLE_GRAD, 0, dim, d, vcell(s, in[3]), coord, ex);
             }
+            break;
+        }
+        case 91: case 92: { /* OpImageSampleProjImplicitLod / ExplicitLod: divide by the last coordinate component */
+            uint32_t mask = wc > 5 ? in[5] : 0;
+            emit(s, I_SAMPLE_PROJ, (int)id_cells(s, in[4]), 0, d, vcell(s, in[3]), vcell(s, in[4]), (op == 92 && (mask & 2)) ? vcell(s, in[6]) : NOCELL);
             break;
         }
         case 95: { /* OpImageFetch */
@@ -1602,6 +1607,15 @@ int dxr_vm_run(dxr_vm *vm, const dxr_frag_ctx *ctx) {
             const dxr_cell *co = &R[o->b], *gx = &R[X[o->c]], *gy = &R[X[o->c + 1]];
             if (o->aux == 3) { dxr_sample_cube_lod(u, co[0].f, co[1].f, co[2].f, 0.0f, &R[o->d]); break; }
             dxr_sample_lod(u, co[0].f, co[1].f, dxr_lod_from_grad(u, gx[0].f, gx[1].f, gy[0].f, gy[1].f), &R[o->d]);
+            break;
+        }
+        case I_SAMPLE_PROJ: {
+            uint32_t bi = R[o->a].u;
+            const dxr_uniform_binding *u = bi < DXR_MAX_UNIFORMS ? &ctx->uniforms[bi] : NULL;
+            const dxr_cell *co = &R[o->b];
+            float q = co[o->n - 1].f;
+            float iq = q != 0.0f ? 1.0f / q : 0.0f;
+            dxr_sample_lod(u, co[0].f * iq, co[1].f * iq, o->c != NOCELL ? R[o->c].f : 0.0f, &R[o->d]);
             break;
         }
         case I_FETCH: {

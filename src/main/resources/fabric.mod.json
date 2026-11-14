@@ -1,0 +1,29 @@
+{
+	"schemaVersion": 1,
+	"id": "dxrender",
+	"version": "${version}",
+	"name": "DX Render",
+	"description": "Independent software graphics backend for Minecraft: its own CPU rasterizer, SPIR-V shader interpreter and presentation path. Does not use OpenGL, OpenGL ES or Vulkan to draw.",
+	"authors": [
+		"ARTYONIX STUDIOS"
+	],
+	"license": "All-Rights-Reserved",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"studios.artyonix.dxrender.integration.DxRenderClient"
+		]
+	},
+	"mixins": [
+		{
+			"config": "dxrender.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

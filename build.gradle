@@ -11,6 +11,49 @@ dependencies {
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 }
 
+loom {
+	runs {
+		client {
+			// e.g. -PdxVmArgs="-Ddxrender.dumpDir=/tmp/frames -Ddxrender.dumpEvery=60"
+			if (project.hasProperty('dxVmArgs')) {
+				vmArgs(project.property('dxVmArgs').toString().split(' '))
+			}
+		}
+	}
+}
+
+// ---- native core -----------------------------------------------------------------------
+def nativeOut = layout.buildDirectory.dir('natives')
+def nativeSources = fileTree('native') { include 'src/**', 'include/**', 'build.sh' }
+def ndkHome = System.getenv('ANDROID_NDK_HOME') ?: (project.findProperty('ndkHome') ?: '/opt/android/android-ndk-r29')
+
+tasks.register('nativeLinux', Exec) {
+	description = 'Builds libdxrender.so for linux-x86_64 (used by the desktop tests)'
+	inputs.files(nativeSources)
+	outputs.dir(nativeOut.map { it.dir('natives/linux-x86_64') })
+	environment 'JAVA_HOME', System.getProperty('java.home')
+	commandLine 'bash', file('native/build.sh').absolutePath, 'linux-x86_64', nativeOut.get().dir('natives/linux-x86_64').asFile.absolutePath
+}
+
+tasks.register('nativeAndroid', Exec) {
+	description = 'Builds libdxrender.so for Android arm64-v8a (needs the Android NDK)'
+	inputs.files(nativeSources)
+	outputs.dir(nativeOut.map { it.dir('natives/android-arm64') })
+	environment 'ANDROID_NDK_HOME', ndkHome
+	onlyIf { new File(ndkHome.toString()).isDirectory() }
+	commandLine 'bash', file('native/build.sh').absolutePath, 'android-arm64', nativeOut.get().dir('natives/android-arm64').asFile.absolutePath
+}
+
+processResources {
+	dependsOn 'nativeLinux', 'nativeAndroid'
+	from(nativeOut)
+	def version = project.version
+	inputs.property 'version', version
+	filesMatching('fabric.mod.json') {
+		expand 'version': version
+	}
+}
+
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = 25
 	it.options.encoding = 'UTF-8'
@@ -19,4 +62,10 @@ tasks.withType(JavaCompile).configureEach {
 java {
 	sourceCompatibility = JavaVersion.VERSION_25
 	targetCompatibility = JavaVersion.VERSION_25
+}
+
+jar {
+	manifest {
+		attributes 'Implementation-Title': 'DX Render', 'Implementation-Version': project.version, 'Implementation-Vendor': 'ARTYONIX STUDIOS'
+	}
 }
