@@ -38,7 +38,6 @@ public final class DxConfig {
 	public int workerThreads = 0;
 	public int tileSize = 32;
 	public boolean textureCache = true;
-	public boolean chunkRendering = true;
 	public boolean occlusionCulling = true;
 	public boolean framePacing = true;
 	public boolean debugOverlay = true;
@@ -136,7 +135,6 @@ public final class DxConfig {
 				renderScale = 50;
 				framePacing = true;
 				occlusionCulling = true;
-				chunkRendering = true;
 				textureCache = true;
 				fastShaders = true;
 			}
@@ -146,7 +144,6 @@ public final class DxConfig {
 				renderScale = 66;
 				framePacing = true;
 				occlusionCulling = true;
-				chunkRendering = true;
 				textureCache = true;
 				fastShaders = true;
 			}
@@ -156,7 +153,6 @@ public final class DxConfig {
 				renderScale = 100;
 				framePacing = false;
 				occlusionCulling = true;
-				chunkRendering = true;
 				textureCache = true;
 				fastShaders = true;
 			}

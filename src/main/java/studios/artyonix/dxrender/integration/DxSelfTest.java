@@ -40,6 +40,8 @@ public final class DxSelfTest {
 	private static long lastLog, lastShot;
 	private static final boolean RESIZE = Boolean.getBoolean("dxrender.selftest.resize");
 	private static int resizeStep;
+	private static final boolean SETTINGS = Boolean.getBoolean("dxrender.selftest.settings");
+	private static boolean settingsOpened;
 
 	private DxSelfTest() {
 	}
@@ -142,6 +144,11 @@ public final class DxSelfTest {
 				DxRender.LOGGER.info("[selftest] resizing window to 640x400");
 				mc.getWindow().setWindowed(640, 400);
 			}
+		}
+		if (SETTINGS && !settingsOpened && inWorldSince != 0L && inWorldSince < Long.MAX_VALUE / 4 && now - inWorldSince > SECONDS * 1_000_000_000L / 2) {
+			settingsOpened = true;
+			DxRender.LOGGER.info("[selftest] opening the DX Render settings screen");
+			mc.gui.setScreen(new studios.artyonix.dxrender.integration.gui.DxSettingsScreen(null));
 		}
 		if (inWorldSince != 0L && now - inWorldSince > SECONDS * 1_000_000_000L) {
 			DxRender.LOGGER.info("[selftest] done: {} | vulkan validation messages: {}", statsLine(), VkDriver.validationMessages());
