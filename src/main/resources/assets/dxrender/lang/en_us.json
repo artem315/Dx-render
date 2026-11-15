@@ -32,5 +32,11 @@
  "dxrender.settings.overlay": "Debug Overlay",
  "dxrender.settings.overlay.tooltip": "Measured FPS, frame time, CPU/GPU time, draw calls, triangles, memory and shader cache in the top left corner.",
  "dxrender.settings.bench": "Benchmark Log",
- "dxrender.settings.bench.tooltip": "Write one CSV line per second to dxrender-bench.csv in the game directory."
+ "dxrender.settings.bench.tooltip": "Write one CSV line per second to dxrender-bench.csv in the game directory.",
+ "dxrender.settings.kernel": "Kernel GPU probe...",
+ "dxrender.settings.kernel.tooltip": "Experimental: talk to the Mali kernel driver directly, without Vulkan or OpenGL, and report what this device allows.",
+ "dxrender.kernel.title": "DX Render - kernel GPU interface (experimental)",
+ "dxrender.kernel.intro": "This probe talks to the Arm Mali kernel driver (/dev/mali0) directly, without Vulkan or OpenGL: driver handshake, GPU properties, GPU memory, and - with the second button - a short command stream executed by the GPU. It does not render the game. The report is also saved to dxrender/gpu-kernel-probe.txt.",
+ "dxrender.kernel.run_memory": "Probe driver + memory",
+ "dxrender.kernel.run_commands": "+ GPU command test"
 }

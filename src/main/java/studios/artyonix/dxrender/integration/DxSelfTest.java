@@ -17,6 +17,7 @@ import studios.artyonix.dxrender.core.DxRender;
 import studios.artyonix.dxrender.device.DxDevice;
 import studios.artyonix.dxrender.device.DxSurface;
 import studios.artyonix.dxrender.gpu.DxStats;
+import studios.artyonix.dxrender.gpu.kbase.DxKernelGpu;
 import studios.artyonix.dxrender.gpu.vulkan.VkDriver;
 import studios.artyonix.dxrender.profiler.DxProfiler;
 
@@ -47,6 +48,9 @@ public final class DxSelfTest {
 	}
 
 	static void register() {
+		if (Boolean.getBoolean("dxrender.kernelProbe")) {
+			DxKernelGpu.probe(true, null);
+		}
 		if (MODE.isEmpty() && !LOG_STATS) {
 			return;
 		}
@@ -148,7 +152,8 @@ public final class DxSelfTest {
 		if (SETTINGS && !settingsOpened && inWorldSince != 0L && inWorldSince < Long.MAX_VALUE / 4 && now - inWorldSince > SECONDS * 1_000_000_000L / 2) {
 			settingsOpened = true;
 			DxRender.LOGGER.info("[selftest] opening the DX Render settings screen");
-			mc.gui.setScreen(new studios.artyonix.dxrender.integration.gui.DxSettingsScreen(null));
+			mc.gui.setScreen(Boolean.getBoolean("dxrender.kernelProbe") ? new studios.artyonix.dxrender.integration.gui.DxKernelProbeScreen(null)
+				: new studios.artyonix.dxrender.integration.gui.DxSettingsScreen(null));
 		}
 		if (inWorldSince != 0L && now - inWorldSince > SECONDS * 1_000_000_000L) {
 			DxRender.LOGGER.info("[selftest] done: {} | vulkan validation messages: {}", statsLine(), VkDriver.validationMessages());

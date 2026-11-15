@@ -121,6 +121,9 @@ public final class DxNative {
 
 	public static native String nProfileText(long device, boolean reset);
 
+	/** Experimental kernel GPU interface probe (Mali kbase), see native/src/dxr_kbase.c. */
+	public static native String nKbaseProbe(boolean runCommands);
+
 	public static native int nPassBegin(long device, long passBlock);
 
 	public static native int nDraw(long device, long drawBlock);

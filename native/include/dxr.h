@@ -179,6 +179,10 @@ void dxr_present_blit(dxr_device *dev, const uint8_t *src, int src_w, int src_h,
 /* Android only: posts the image to an ANativeWindow through ANativeWindow_lock (CPU buffer path, no EGL). */
 int dxr_present_android(dxr_device *dev, void *native_window, const uint8_t *src, int src_w, int src_h, int src_stride);
 
+/* ---- kernel GPU interface (experimental, Mali kbase) --------------------------------- */
+/* Writes a human readable report; returns the last stage reached (0..6, see dxr_kbase.c). */
+int dxr_kbase_probe(char *report, size_t cap, int run_commands);
+
 #ifdef __cplusplus
 }
 #endif

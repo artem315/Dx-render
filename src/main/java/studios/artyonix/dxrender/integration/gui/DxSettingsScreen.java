@@ -113,7 +113,9 @@ public final class DxSettingsScreen extends Screen {
 			(b, v) -> this.cfg.benchmarkLog = v));
 		y += row;
 
-		this.addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> this.onClose()).bounds(this.width / 2 - 100, this.height - 28, 200, 20).build());
+		this.addRenderableWidget(Button.builder(t("kernel"), b -> this.minecraft.gui.setScreen(new DxKernelProbeScreen(this))).tooltip(tip("kernel"))
+			.bounds(this.width / 2 - 155, this.height - 28, 150, 20).build());
+		this.addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> this.onClose()).bounds(this.width / 2 + 5, this.height - 28, 150, 20).build());
 	}
 
 	@Override

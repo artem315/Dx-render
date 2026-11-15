@@ -143,7 +143,7 @@ on Android, particles-heavy scenes, the Nether/End.
 ## Android (DX Launcher-X) — how to verify
 
 1. Install Fabric Loader 0.20.1 + Fabric API 0.166.2+26.3 for Minecraft 26.3
-   and put `dxrender-1.0.0-ALPHA.2.jar` into `mods/`. The jar contains
+   and put `dxrender-1.0.0-ALPHA.3.jar` into `mods/`. The jar contains
    `natives/android-arm64/libdxrender.so` (CPU backend; the GPU backend is
    pure Java on top of the system Vulkan driver).
 2. The GPU backend needs the system Vulkan driver and an `ANativeWindow`
@@ -154,7 +154,7 @@ on Android, particles-heavy scenes, the Nether/End.
 3. First run with `"renderMode": "GPU"` in `config/dxrender.json` so that a
    failure is reported instead of hidden by AUTO. Check `latest.log` for
    `DX Render GPU backend: Mali-G925 ...` (or the reason it refused).
-4. Press F3: the graphics line reads `DX Render GPU 1.0.0-ALPHA.2 (Vulkan …)`.
+4. Press F3: the graphics line reads `DX Render GPU 1.0.0-ALPHA.3 (Vulkan …)`.
    Press F8 for the settings screen; the overlay shows FPS, frame time, CPU
    and GPU time (Mali supports timestamp queries), draw calls, triangles,
    VRAM estimate, shader cache and pipeline compile time.

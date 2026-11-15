@@ -235,3 +235,13 @@ JFN(jstring, nProfileText)(JNIEnv *env, jclass cls, jlong dev, jboolean reset) {
     dxr_device_profile(DEV(dev), buf, sizeof(buf), reset);
     return (*env)->NewStringUTF(env, buf);
 }
+
+JFN(jstring, nKbaseProbe)(JNIEnv *env, jclass cls, jboolean run_commands) {
+    (void)cls;
+    char *buf = (char *)malloc(16384);
+    if (!buf) return (*env)->NewStringUTF(env, "out of memory");
+    dxr_kbase_probe(buf, 16384, run_commands);
+    jstring s = (*env)->NewStringUTF(env, buf);
+    free(buf);
+    return s;
+}

@@ -32,5 +32,11 @@
  "dxrender.settings.overlay": "Оверлей отладки",
  "dxrender.settings.overlay.tooltip": "Измеренные FPS, время кадра, время CPU/GPU, draw calls, треугольники, память и кэш шейдеров в левом верхнем углу.",
  "dxrender.settings.bench": "Лог бенчмарка",
- "dxrender.settings.bench.tooltip": "Записывать раз в секунду строку CSV в dxrender-bench.csv в папке игры."
+ "dxrender.settings.bench.tooltip": "Записывать раз в секунду строку CSV в dxrender-bench.csv в папке игры.",
+ "dxrender.settings.kernel": "Проверка GPU (ядро)...",
+ "dxrender.settings.kernel.tooltip": "Экспериментально: прямое обращение к драйверу ядра Mali, без Vulkan и OpenGL, и отчёт о том, что позволяет устройство.",
+ "dxrender.kernel.title": "DX Render - интерфейс GPU через ядро (эксперимент)",
+ "dxrender.kernel.intro": "Эта проверка обращается к драйверу ядра Arm Mali (/dev/mali0) напрямую, без Vulkan и OpenGL: согласование версий, свойства GPU, память GPU и - второй кнопкой - короткая программа команд, которую выполняет сам GPU. Игру она не рисует. Отчёт также сохраняется в dxrender/gpu-kernel-probe.txt.",
+ "dxrender.kernel.run_memory": "Драйвер + память",
+ "dxrender.kernel.run_commands": "+ тест команд GPU"
 }
