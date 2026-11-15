@@ -1,4 +1,4 @@
-package studios.artyonix.dxrender.device;
+package studios.artyonix.dxrender.gpu.cpu;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -11,12 +11,12 @@ import studios.artyonix.dxrender.core.DxRender;
  * default 120) is written as a PNG exactly as the rasterizer produced it. Used by the
  * automated checks; inactive unless the property is set.
  */
-final class DxFrameDump {
+final class CpuFrameDump {
 	private static final String DIR = System.getProperty("dxrender.dumpDir");
 	private static final int EVERY = Math.max(1, Integer.getInteger("dxrender.dumpEvery", 120));
 	private static long frame;
 
-	private DxFrameDump() {
+	private CpuFrameDump() {
 	}
 
 	static void maybeDump(final long src, final int w, final int h) {

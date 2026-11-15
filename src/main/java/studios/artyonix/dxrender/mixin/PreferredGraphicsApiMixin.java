@@ -26,7 +26,8 @@ public abstract class PreferredGraphicsApiMixin {
 			return;
 		}
 		GpuBackend[] vanilla = cir.getReturnValue();
-		if (!cfg.fallbackToVanilla) {
+		// GPU mode is strict: if the GPU backend cannot start the game reports why instead of quietly using another renderer.
+		if (!cfg.fallbackToVanilla || cfg.effectiveMode() == DxConfig.RenderMode.GPU) {
 			cir.setReturnValue(new GpuBackend[]{new DxBackend()});
 			return;
 		}

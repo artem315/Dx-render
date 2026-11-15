@@ -1,0 +1,81 @@
+package studios.artyonix.dxrender.gpu.vulkan;
+
+import static org.lwjgl.vulkan.VK10.*;
+
+import studios.artyonix.dxrender.core.DxNative;
+
+/** DX Render component encodings -> VkFormat. */
+final class VkFormats {
+	private VkFormats() {
+	}
+
+	private static final int[][] TABLE = new int[13][];
+
+	static {
+		TABLE[DxNative.CT_UNORM8] = new int[]{VK_FORMAT_R8_UNORM, VK_FORMAT_R8G8_UNORM, VK_FORMAT_R8G8B8_UNORM, VK_FORMAT_R8G8B8A8_UNORM};
+		TABLE[DxNative.CT_SNORM8] = new int[]{VK_FORMAT_R8_SNORM, VK_FORMAT_R8G8_SNORM, VK_FORMAT_R8G8B8_SNORM, VK_FORMAT_R8G8B8A8_SNORM};
+		TABLE[DxNative.CT_UNORM16] = new int[]{VK_FORMAT_R16_UNORM, VK_FORMAT_R16G16_UNORM, VK_FORMAT_R16G16B16_UNORM, VK_FORMAT_R16G16B16A16_UNORM};
+		TABLE[DxNative.CT_SNORM16] = new int[]{VK_FORMAT_R16_SNORM, VK_FORMAT_R16G16_SNORM, VK_FORMAT_R16G16B16_SNORM, VK_FORMAT_R16G16B16A16_SNORM};
+		TABLE[DxNative.CT_UINT8] = new int[]{VK_FORMAT_R8_UINT, VK_FORMAT_R8G8_UINT, VK_FORMAT_R8G8B8_UINT, VK_FORMAT_R8G8B8A8_UINT};
+		TABLE[DxNative.CT_SINT8] = new int[]{VK_FORMAT_R8_SINT, VK_FORMAT_R8G8_SINT, VK_FORMAT_R8G8B8_SINT, VK_FORMAT_R8G8B8A8_SINT};
+		TABLE[DxNative.CT_UINT16] = new int[]{VK_FORMAT_R16_UINT, VK_FORMAT_R16G16_UINT, VK_FORMAT_R16G16B16_UINT, VK_FORMAT_R16G16B16A16_UINT};
+		TABLE[DxNative.CT_SINT16] = new int[]{VK_FORMAT_R16_SINT, VK_FORMAT_R16G16_SINT, VK_FORMAT_R16G16B16_SINT, VK_FORMAT_R16G16B16A16_SINT};
+		TABLE[DxNative.CT_UINT32] = new int[]{VK_FORMAT_R32_UINT, VK_FORMAT_R32G32_UINT, VK_FORMAT_R32G32B32_UINT, VK_FORMAT_R32G32B32A32_UINT};
+		TABLE[DxNative.CT_SINT32] = new int[]{VK_FORMAT_R32_SINT, VK_FORMAT_R32G32_SINT, VK_FORMAT_R32G32B32_SINT, VK_FORMAT_R32G32B32A32_SINT};
+		TABLE[DxNative.CT_FLOAT16] = new int[]{VK_FORMAT_R16_SFLOAT, VK_FORMAT_R16G16_SFLOAT, VK_FORMAT_R16G16B16_SFLOAT, VK_FORMAT_R16G16B16A16_SFLOAT};
+		TABLE[DxNative.CT_FLOAT32] = new int[]{VK_FORMAT_R32_SFLOAT, VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT};
+		TABLE[DxNative.CT_DEPTH32F] = new int[]{VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT};
+	}
+
+	static int format(final int componentType, final int componentCount) {
+		if (componentType < 0 || componentType >= TABLE.length || componentCount < 1 || componentCount > 4) {
+			return VK_FORMAT_UNDEFINED;
+		}
+		return TABLE[componentType][componentCount - 1];
+	}
+
+	static boolean isDepth(final int componentType) {
+		return componentType == DxNative.CT_DEPTH32F;
+	}
+
+	static int componentBytes(final int componentType) {
+		return switch (componentType) {
+			case DxNative.CT_UNORM8, DxNative.CT_SNORM8, DxNative.CT_UINT8, DxNative.CT_SINT8 -> 1;
+			case DxNative.CT_UNORM16, DxNative.CT_SNORM16, DxNative.CT_UINT16, DxNative.CT_SINT16, DxNative.CT_FLOAT16 -> 2;
+			default -> 4;
+		};
+	}
+
+	static String result(final int code) {
+		return switch (code) {
+			case VK_SUCCESS -> "VK_SUCCESS";
+			case VK_NOT_READY -> "VK_NOT_READY";
+			case VK_TIMEOUT -> "VK_TIMEOUT";
+			case VK_INCOMPLETE -> "VK_INCOMPLETE";
+			case VK_ERROR_OUT_OF_HOST_MEMORY -> "VK_ERROR_OUT_OF_HOST_MEMORY";
+			case VK_ERROR_OUT_OF_DEVICE_MEMORY -> "VK_ERROR_OUT_OF_DEVICE_MEMORY";
+			case VK_ERROR_INITIALIZATION_FAILED -> "VK_ERROR_INITIALIZATION_FAILED";
+			case VK_ERROR_DEVICE_LOST -> "VK_ERROR_DEVICE_LOST";
+			case VK_ERROR_MEMORY_MAP_FAILED -> "VK_ERROR_MEMORY_MAP_FAILED";
+			case VK_ERROR_LAYER_NOT_PRESENT -> "VK_ERROR_LAYER_NOT_PRESENT";
+			case VK_ERROR_EXTENSION_NOT_PRESENT -> "VK_ERROR_EXTENSION_NOT_PRESENT";
+			case VK_ERROR_FEATURE_NOT_PRESENT -> "VK_ERROR_FEATURE_NOT_PRESENT";
+			case VK_ERROR_INCOMPATIBLE_DRIVER -> "VK_ERROR_INCOMPATIBLE_DRIVER";
+			case VK_ERROR_TOO_MANY_OBJECTS -> "VK_ERROR_TOO_MANY_OBJECTS";
+			case VK_ERROR_FORMAT_NOT_SUPPORTED -> "VK_ERROR_FORMAT_NOT_SUPPORTED";
+			case VK_ERROR_FRAGMENTED_POOL -> "VK_ERROR_FRAGMENTED_POOL";
+			case -1000000000 -> "VK_ERROR_SURFACE_LOST_KHR";
+			case -1000000001 -> "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR";
+			case 1000001003 -> "VK_SUBOPTIMAL_KHR";
+			case -1000001004 -> "VK_ERROR_OUT_OF_DATE_KHR";
+			case -1000069000 -> "VK_ERROR_OUT_OF_POOL_MEMORY";
+			default -> "VkResult(" + code + ")";
+		};
+	}
+
+	static void check(final int code, final String what) {
+		if (code != VK_SUCCESS) {
+			throw new IllegalStateException(what + " failed: " + result(code));
+		}
+	}
+}

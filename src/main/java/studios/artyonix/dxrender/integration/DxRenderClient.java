@@ -28,7 +28,10 @@ public final class DxRenderClient implements ClientModInitializer {
 		// The backend is created after mod initialisation, so report once the client is up.
 		ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
 			if (DxRender.isBackendActive()) {
-				DxRender.LOGGER.info("DX Render {} is producing the frames (software rasterizer, no GPU API in use)", DxRender.version());
+				var dev = DxRender.device();
+				String backend = dev == null ? "?" : dev.driver().backendName();
+				DxRender.LOGGER.info("DX Render {} is producing the frames on the {} backend ({})", DxRender.version(), backend,
+					"CPU".equals(backend) ? "software rasterizer and SPIR-V interpreter, no GPU API in use" : "Vulkan GPU driver, " + dev.driver().caps().deviceName());
 			} else {
 				DxRender.LOGGER.warn("DX Render is NOT active: {}. The game is running on its own renderer.", DxRender.inactiveReason());
 			}

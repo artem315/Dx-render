@@ -16,7 +16,9 @@
 extern "C" {
 #endif
 
-#define DXR_VERSION_STRING "1.0.0-ALPHA.1"
+#ifndef DXR_VERSION_STRING
+#define DXR_VERSION_STRING "dev"
+#endif
 
 #define DXR_MAX_THREADS 16
 #define DXR_MAX_MIPS 16

@@ -32,6 +32,8 @@ tasks.register('nativeLinux', Exec) {
 	inputs.files(nativeSources)
 	outputs.dir(nativeOut.map { it.dir('natives/linux-x86_64') })
 	environment 'JAVA_HOME', System.getProperty('java.home')
+	environment 'DXR_VERSION', project.version.toString()
+	inputs.property 'version', project.version.toString()
 	commandLine 'bash', file('native/build.sh').absolutePath, 'linux-x86_64', nativeOut.get().dir('natives/linux-x86_64').asFile.absolutePath
 }
 
@@ -40,6 +42,8 @@ tasks.register('nativeAndroid', Exec) {
 	inputs.files(nativeSources)
 	outputs.dir(nativeOut.map { it.dir('natives/android-arm64') })
 	environment 'ANDROID_NDK_HOME', ndkHome
+	environment 'DXR_VERSION', project.version.toString()
+	inputs.property 'version', project.version.toString()
 	onlyIf { new File(ndkHome.toString()).isDirectory() }
 	commandLine 'bash', file('native/build.sh').absolutePath, 'android-arm64', nativeOut.get().dir('natives/android-arm64').asFile.absolutePath
 }

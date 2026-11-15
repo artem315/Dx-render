@@ -3,23 +3,32 @@ package studios.artyonix.dxrender.device;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.backend.common.BaseGpuBuffer;
 import org.lwjgl.system.MemoryUtil;
+import studios.artyonix.dxrender.memory.DxMemoryAllocator;
 import studios.artyonix.dxrender.memory.DxMemoryManager;
 
-/** A buffer is plain host memory; "mapping" it is free. */
+/**
+ * DX Render buffer. Its memory is always addressable by the CPU (host memory for the CPU
+ * backend, persistently mapped device memory for the GPU backend), so "mapping" is free.
+ */
 public final class DxBuffer extends BaseGpuBuffer {
 	private final DxMemoryManager memory;
-	private final long address;
+	private final DxMemoryAllocator.Allocation allocation;
 	private boolean closed;
 
 	public DxBuffer(final DxMemoryManager memory, final int usage, final long size) {
 		super(usage, size);
 		this.memory = memory;
-		this.address = memory.allocate(size);
-		MemoryUtil.memSet(this.address, 0, size);
+		this.allocation = memory.allocate(size, usage);
+		MemoryUtil.memSet(this.allocation.address, 0, size);
 	}
 
 	public long address() {
-		return this.address;
+		return this.allocation.address;
+	}
+
+	/** Driver object behind the buffer (0 for the CPU backend). */
+	public long handle() {
+		return this.allocation.handle;
 	}
 
 	@Override
@@ -31,7 +40,7 @@ public final class DxBuffer extends BaseGpuBuffer {
 	public void close() {
 		if (!this.closed) {
 			this.closed = true;
-			this.memory.free(this.address, this.size());
+			this.memory.free(this.allocation);
 		}
 	}
 
@@ -46,7 +55,7 @@ public final class DxBuffer extends BaseGpuBuffer {
 		if (length > Integer.MAX_VALUE) {
 			throw new IllegalArgumentException("Mapping buffers larger than 2GB is not supported");
 		}
-		return new GpuBufferSlice.MappedView(this.slice(offset, length), MemoryUtil.memByteBuffer(this.address + offset, (int)length), () -> {
+		return new GpuBufferSlice.MappedView(this.slice(offset, length), MemoryUtil.memByteBuffer(this.allocation.address + offset, (int)length), () -> {
 		});
 	}
 }

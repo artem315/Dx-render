@@ -6,11 +6,13 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Locale;
-import studios.artyonix.dxrender.core.DxNative;
+import studios.artyonix.dxrender.device.DxDevice;
+import studios.artyonix.dxrender.gpu.DxStats;
 
 /**
  * DX Render Profiler: real measurements only. Frame times are wall clock intervals between
- * presented frames; stage times come from timers inside the native core.
+ * submitted frames; the other figures are counters and timers kept by the active driver
+ * (and GPU timestamp queries where the device has them).
  */
 public final class DxProfiler {
 	private static final int WINDOW = 240;
@@ -18,16 +20,18 @@ public final class DxProfiler {
 	private final long[] frameNs = new long[WINDOW];
 	private int count, head;
 	private long lastPresent;
-	private final long[] stats = new long[DxNative.ST_COUNT];
-	private final long[] accum = new long[DxNative.ST_COUNT];
-	private final long[] lastSecond = new long[DxNative.ST_COUNT];
+	private final long[] stats = new long[DxStats.COUNT];
+	private final long[] accum = new long[DxStats.COUNT];
+	private final long[] lastSecond = new long[DxStats.COUNT];
+	private final long[] totals = new long[DxStats.COUNT];
 	private int accumFrames, lastSecondFrames = 1;
 	private long secondStart;
 	private double fps;
 	private Path benchFile;
 	private long totalFrames;
+	private String backend = "?";
 
-	public synchronized void frame(final long device) {
+	public synchronized void frame(final DxDevice device) {
 		long now = System.nanoTime();
 		if (this.lastPresent != 0L) {
 			this.frameNs[this.head] = now - this.lastPresent;
@@ -38,9 +42,20 @@ public final class DxProfiler {
 		}
 		this.lastPresent = now;
 		this.totalFrames++;
-		DxNative.nDeviceStats(device, this.stats, true);
+		this.backend = device.driver().backendName();
+		device.driver().collectStats(this.stats, true);
+		long driverTime = device.queue().takeDriverTime();
+		if (this.stats[DxStats.NS_CPU] == 0L) {
+			this.stats[DxStats.NS_CPU] = driverTime;
+		}
 		for (int i = 0; i < this.accum.length; i++) {
-			this.accum[i] = i == DxNative.ST_ARENA_PEAK || i == DxNative.ST_TEXTURE_BYTES ? this.stats[i] : this.accum[i] + this.stats[i];
+			if (DxStats.isGauge(i)) {
+				this.accum[i] = this.stats[i];
+				this.totals[i] = this.stats[i];
+			} else {
+				this.accum[i] += this.stats[i];
+				this.totals[i] += this.stats[i];
+			}
 		}
 		this.accumFrames++;
 		if (this.secondStart == 0L) {
@@ -55,6 +70,10 @@ public final class DxProfiler {
 			this.secondStart = now;
 			this.writeBenchLine();
 		}
+	}
+
+	public synchronized String backend() {
+		return this.backend;
 	}
 
 	public synchronized double fps() {
@@ -88,13 +107,14 @@ public final class DxProfiler {
 		return copy[idx] / 1.0e6;
 	}
 
-	/** Per frame average of a native counter over the last full second. */
+	/** Per frame average of a counter over the last full second (gauges: the latest value). */
 	public synchronized double perFrame(final int statIndex) {
-		return this.lastSecond[statIndex] / (double)this.lastSecondFrames;
+		return DxStats.isGauge(statIndex) ? this.lastSecond[statIndex] : this.lastSecond[statIndex] / (double)this.lastSecondFrames;
 	}
 
-	public synchronized long lastValue(final int statIndex) {
-		return this.lastSecond[statIndex];
+	/** Sum since start-up (gauges: the latest value). */
+	public synchronized long total(final int statIndex) {
+		return this.totals[statIndex];
 	}
 
 	public synchronized void setBenchmarkFile(final Path file) {
@@ -107,11 +127,11 @@ public final class DxProfiler {
 		}
 		try {
 			if (!Files.exists(this.benchFile)) {
-				Files.writeString(this.benchFile, "time_ms,fps,frame_ms,p99_ms,geometry_ms,raster_ms,triangles,fragments,draw_calls\n", StandardOpenOption.CREATE);
+				Files.writeString(this.benchFile, "time_ms,backend,fps,frame_ms,p99_ms,cpu_ms,gpu_ms,draw_calls,triangles,vram_mb\n", StandardOpenOption.CREATE);
 			}
-			String line = String.format(Locale.ROOT, "%d,%.2f,%.3f,%.3f,%.3f,%.3f,%.0f,%.0f,%.0f%n", System.currentTimeMillis(), this.fps, this.frameTimeMs(),
-				this.frameTimePercentileMs(0.99), this.perFrame(DxNative.ST_NS_GEOMETRY) / 1.0e6, this.perFrame(DxNative.ST_NS_RASTER) / 1.0e6,
-				this.perFrame(DxNative.ST_TRIS_BINNED), this.perFrame(DxNative.ST_FRAGS), this.perFrame(DxNative.ST_DRAW_CALLS));
+			String line = String.format(Locale.ROOT, "%d,%s,%.2f,%.3f,%.3f,%.3f,%.3f,%.0f,%.0f,%.1f%n", System.currentTimeMillis(), this.backend, this.fps,
+				this.frameTimeMs(), this.frameTimePercentileMs(0.99), this.perFrame(DxStats.NS_CPU) / 1.0e6, this.perFrame(DxStats.NS_GPU) / 1.0e6,
+				this.perFrame(DxStats.DRAW_CALLS), this.perFrame(DxStats.TRIANGLES), this.perFrame(DxStats.VRAM_BYTES) / 1048576.0);
 			Files.writeString(this.benchFile, line, StandardOpenOption.APPEND);
 		} catch (IOException ignored) {
 			this.benchFile = null;

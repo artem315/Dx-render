@@ -14,6 +14,15 @@ public final class DxConfig {
 		SAFE, BALANCED, EXTREME, CUSTOM
 	}
 
+	/**
+	 * AUTO: GPU backend when a hardware Vulkan device works, otherwise the CPU rasterizer.
+	 * GPU: Vulkan GPU backend only; start-up fails with an explanation if it cannot run.
+	 * CPU: software rasterizer and SPIR-V interpreter.
+	 */
+	public enum RenderMode {
+		AUTO, GPU, CPU
+	}
+
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static DxConfig instance;
 	private static Path path;
@@ -22,6 +31,8 @@ public final class DxConfig {
 	public boolean enabled = true;
 	/** If the DX Render backend cannot start, let the game continue with its own renderer instead of failing. */
 	public boolean fallbackToVanilla = true;
+	/** Which DX Render backend draws the game. Takes effect at the next start. */
+	public RenderMode renderMode = RenderMode.AUTO;
 	public Preset preset = Preset.BALANCED;
 	/** Rendering threads including the main thread; 0 = all cores. */
 	public int workerThreads = 0;
@@ -76,9 +87,24 @@ public final class DxConfig {
 		}
 	}
 
+	/** The configured mode, unless -Ddxrender.mode=auto|gpu|cpu overrides it for this run. */
+	public RenderMode effectiveMode() {
+		String override = System.getProperty("dxrender.mode");
+		if (override != null) {
+			try {
+				return RenderMode.valueOf(override.trim().toUpperCase(java.util.Locale.ROOT));
+			} catch (IllegalArgumentException ignored) {
+			}
+		}
+		return renderMode == null ? RenderMode.AUTO : renderMode;
+	}
+
 	public void sanitize() {
 		if (preset == null) {
 			preset = Preset.CUSTOM;
+		}
+		if (renderMode == null) {
+			renderMode = RenderMode.AUTO;
 		}
 		workerThreads = Math.max(0, Math.min(16, workerThreads));
 		if (tileSize != 16 && tileSize != 32 && tileSize != 64 && tileSize != 128) {
