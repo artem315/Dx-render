@@ -222,6 +222,29 @@ public final class DxPipeline implements BackendRenderPipeline {
 	}
 
 	/** Validates the SPIR-V of both stages and asks the active driver to compile the pipeline. Returns null (after logging why) on failure. */
+	private static final java.util.concurrent.atomic.AtomicInteger FAILURES = new java.util.concurrent.atomic.AtomicInteger();
+	private static final java.util.ArrayDeque<String> RECENT_FAILURES = new java.util.ArrayDeque<>();
+
+	private static void recordFailure(final String name, final String reason) {
+		FAILURES.incrementAndGet();
+		synchronized (RECENT_FAILURES) {
+			RECENT_FAILURES.addLast(name + ": " + reason);
+			while (RECENT_FAILURES.size() > 10) {
+				RECENT_FAILURES.removeFirst();
+			}
+		}
+	}
+
+	public static int failureCount() {
+		return FAILURES.get();
+	}
+
+	public static java.util.List<String> recentFailures() {
+		synchronized (RECENT_FAILURES) {
+			return java.util.List.copyOf(RECENT_FAILURES);
+		}
+	}
+
 	public static @Nullable DxPipeline create(final DxDevice device, final BackendRenderPipeline.CreateInfo info) {
 		try {
 			DxShader vs = null, fs = null;
@@ -243,9 +266,11 @@ public final class DxPipeline implements BackendRenderPipeline {
 			return pipeline;
 		} catch (DxShaderException e) {
 			DxRender.LOGGER.error("DX Render could not build pipeline {}: {}", info.name(), e.getMessage());
+			recordFailure(info.name(), e.getMessage());
 			return null;
 		} catch (RuntimeException e) {
 			DxRender.LOGGER.error("DX Render could not build pipeline {}", info.name(), e);
+			recordFailure(info.name(), String.valueOf(e));
 			return null;
 		}
 	}

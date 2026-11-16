@@ -14,6 +14,7 @@ public final class DxRender {
 	private static volatile boolean backendActive;
 	private static volatile String inactiveReason = "not initialised";
 	private static volatile studios.artyonix.dxrender.device.DxDevice device;
+	private static volatile String gpuFallbackReason;
 
 	private DxRender() {
 	}
@@ -47,6 +48,15 @@ public final class DxRender {
 		device = dev;
 		backendActive = true;
 		inactiveReason = "";
+	}
+
+	/** Why AUTO did not pick the GPU backend in this session (null when it did, or when not in AUTO). */
+	public static String gpuFallbackReason() {
+		return gpuFallbackReason;
+	}
+
+	public static void setGpuFallbackReason(final String reason) {
+		gpuFallbackReason = reason;
 	}
 
 	public static studios.artyonix.dxrender.device.DxDevice device() {

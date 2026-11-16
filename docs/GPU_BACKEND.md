@@ -163,6 +163,35 @@ on Android, particles-heavy scenes, the Nether/End.
 6. Background the app and return: the swapchain must be recreated (log line
    `Couldn't acquire/configure surface` once, then normal frames).
 
+## Field report: Poco X8 Pro Max (2026-11-16)
+
+The user sent `.minecraft/dxrender/vulkan-pipeline-cache.bin` written by the
+GPU backend on the phone. Its header (Vulkan pipeline cache header version 1):
+
+* `vendorID 0x13B5` — ARM
+* `deviceID 0xD8300010` — GPU_ID arch v13.8 r3, product 0, revision r0p1 →
+  **Immortalis-G925** (TKRX)
+* 781 KiB, 126 cached shader programs compiled by Arm's driver, including
+  terrain (`ChunkPosition`), entities (`Light0_Direction`), clouds
+  (`CloudFaces`), order-independent transparency (`DepthBoundsSampler`,
+  `Coeff0`), fog and the menu blur.
+
+So on the target device AUTO selected the DX Render Vulkan GPU backend, the
+hardware driver accepted DX Render's SPIR-V and pipelines, and the backend ran
+until it saved the cache (at exit or after 1024 frames). The file does not
+contain frame rate, image correctness or errors; from ALPHA.4 on that is in
+`dxrender/report.txt` (below).
+
+## Diagnostic report (from ALPHA.4)
+
+`.minecraft/dxrender/report.txt` is rewritten every 30 s and at exit:
+backend and device, driver version, enabled features, why AUTO did not use
+the GPU (if it did not), presentation path, current and per-scene (menus /
+world) FPS min/avg/max with recent samples of frame time, CPU and GPU time,
+draw calls and triangles, memory, shader cache, pipeline compile time,
+rejected pipelines with reasons, and the last kernel GPU probe. This is the
+file to send for diagnosis.
+
 ## Known limitations (1.0)
 
 * Not run on Android or on any hardware GPU yet (see above).

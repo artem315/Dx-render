@@ -38,6 +38,7 @@ public final class DxRenderClient implements ClientModInitializer {
 	public void onInitializeClient() {
 		ensureConfigLoaded();
 		DxSelfTest.register();
+		DxReport.register();
 		KeyMapping open = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.dxrender.settings", InputConstants.KEY_F8,
 			KeyMapping.Category.register(Identifier.fromNamespaceAndPath(DxRender.MOD_ID, "main"))));
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {

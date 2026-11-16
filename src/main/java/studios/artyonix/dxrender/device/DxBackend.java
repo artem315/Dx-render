@@ -61,6 +61,7 @@ public final class DxBackend implements GpuBackend {
 						+ "\nSet \"renderMode\" to AUTO or CPU in config/dxrender.json to use the software rasterizer.", BackendCreationException.Reason.OTHER);
 				}
 				DxRender.LOGGER.warn("DX Render AUTO: GPU backend unavailable ({}), using the CPU rasterizer", gpuFailure);
+				DxRender.setGpuFallbackReason(gpuFailure);
 			}
 		}
 		try {
